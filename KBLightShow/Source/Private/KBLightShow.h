@@ -31,12 +31,15 @@ struct KBColor
 	}
 };
 
-struct FLightShow : FTickableGameObject
+struct FLightShow : FTickableGameObject, IModuleInterface
 {
 	FLightShow();
 	virtual void Tick(float DeltaTime);
 	virtual bool IsTickable() const { return true; }
 	virtual bool IsTickableInEditor() const { return true; }
+
+	virtual void StartupModule() override;
+	virtual void ShutdownModule() override;
 
 	// Put a real stat id here
 	virtual TStatId GetStatId() const
@@ -49,7 +52,7 @@ struct FLightShow : FTickableGameObject
 	int FlashSpeed;
 
 	bool bIsFlashingForEnd;
-
+	bool bInitialized;
 	KBColor CurrentBGColor;
 
 	KBColor UTOrange;

@@ -5,6 +5,8 @@
 #include "UTPlayerController.h"
 #include "UTGameState.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogUTKBLightShow, Log, All);
+
 AKBLightShow::AKBLightShow(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -15,24 +17,40 @@ FLightShow::FLightShow()
 	FrameTimeMinimum = 0.03f;
 	DeltaTimeAccumulator = 0;
 	bIsFlashingForEnd = false;
-	
-	UTOrange.r = 255;
-	UTOrange.g = 73;
-	UTOrange.b = 2;
+	bInitialized = false;
+
+	UTOrange.r = 100;
+	UTOrange.g = 29;
+	UTOrange.b = 1;
 
 	Black.r = 0;
 	Black.g = 0;
 	Black.b = 0;
 
-	CurrentBGColor.r = 255;
-	CurrentBGColor.g = 255;
-	CurrentBGColor.b = 255;
+	CurrentBGColor.r = 100;
+	CurrentBGColor.g = 100;
+	CurrentBGColor.b = 100;
 
 	FlashSpeed = 100;
 }
 
+IMPLEMENT_MODULE(FLightShow, KBLightShow)
+
+void FLightShow::StartupModule()
+{
+	bInitialized = LogiLedInit();
+}
+
+
+void FLightShow::ShutdownModule()
+{
+	LogiLedShutdown();
+}
+
 void FLightShow::Tick(float DeltaTime)
 {
+//	return;
+
 	// We may be going 120hz, don't spam the device
 	DeltaTimeAccumulator += DeltaTime;
 	if (DeltaTimeAccumulator < FrameTimeMinimum)
@@ -40,6 +58,14 @@ void FLightShow::Tick(float DeltaTime)
 		return;
 	}
 	DeltaTimeAccumulator = 0;
+
+	if (!bInitialized)
+	{
+		// Supposed to not do anything for a while, just let this sink in
+		bInitialized = LogiLedInit();
+		DeltaTimeAccumulator = -10 * FrameTimeMinimum;
+		return;
+	}
 
 	bool bShouldFlashForEnd = false;
 
@@ -86,18 +112,20 @@ void FLightShow::Tick(float DeltaTime)
 			else if (GS->HasMatchStarted())
 			{
 				ClearColorToBlack();
+				
+				bool bSetLightingResult = false;
 
-				LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::W, 0, 0, 255);
-				LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::A, 0, 0, 255);
-				LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::S, 0, 0, 255);
-				LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::D, 0, 0, 255);
-				LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::SPACE, 0, 0, 255);
+				bSetLightingResult = LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::W, 0, 0, 100);
+				bSetLightingResult = LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::A, 0, 0, 100);
+				bSetLightingResult = LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::S, 0, 0, 100);
+				bSetLightingResult = LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::D, 0, 0, 100);
+				bSetLightingResult = LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::SPACE, 0, 0, 100);
 
 				if (UTPC->GetUTCharacter() && !UTPC->GetUTCharacter()->IsDead())
 				{
-					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::J, 165, 0, 165);
-					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::K, 165, 0, 165);
-					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::L, 165, 0, 165);
+					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::J, 64, 0, 64);
+					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::K, 64, 0, 64);
+					LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName::L, 64, 0, 64);
 
 					int32 CurrentWeaponGroup = -1;
 					if (UTPC->GetUTCharacter()->GetWeapon())
@@ -110,7 +138,7 @@ void FLightShow::Tick(float DeltaTime)
 					for (int32 i = 0; i < 10; i++)
 					{
 						bFoundWeapon = false;
-						WeaponGroupColor = KBColor(0, 0, 255);
+						WeaponGroupColor = KBColor(0, 0, 100);
 
 						for (TInventoryIterator<AUTWeapon> It(UTPC->GetUTCharacter()); It; ++It)
 						{
@@ -120,9 +148,9 @@ void FLightShow::Tick(float DeltaTime)
 								if (Weap->ClassicGroup == (i + 1))
 								{
 									bFoundWeapon = true;
-									WeaponGroupColor.r = Weap->IconColor.R * 255;
-									WeaponGroupColor.g = Weap->IconColor.G * 255;
-									WeaponGroupColor.b = Weap->IconColor.B * 255;
+									WeaponGroupColor.r = Weap->IconColor.R * 100;
+									WeaponGroupColor.g = Weap->IconColor.G * 100;
+									WeaponGroupColor.b = Weap->IconColor.B * 100;
 									break;
 								}
 							}
@@ -130,12 +158,13 @@ void FLightShow::Tick(float DeltaTime)
 
 						if ((i + 1) == CurrentWeaponGroup)
 						{
-							LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName(LogiLed::KeyName::ONE + i), 255, 0, 0);
+							LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName(LogiLed::KeyName::ONE + i), 100, 0, 0);
 						}
 						else if (bFoundWeapon)
 						{
 							// WeaponColor stored in Weap->IconColor isn't specific enough
-							LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName(LogiLed::KeyName::ONE + i), 0, 255, 0);
+							LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName(LogiLed::KeyName::ONE + i), 0, 100, 0);
+							//LogiLedSetLightingForKeyWithKeyName(LogiLed::KeyName(LogiLed::KeyName::ONE + i), WeaponGroupColor.r, WeaponGroupColor.g, WeaponGroupColor.b);
 						}
 						else
 						{
@@ -185,8 +214,14 @@ void FLightShow::ClearColorToUTOrange()
 		return;
 	}
 
-	CurrentBGColor = UTOrange;
-	LogiLedSetLighting(UTOrange.r, UTOrange.g, UTOrange.b);
+	if (LogiLedSetLighting(UTOrange.r, UTOrange.g, UTOrange.b))
+	{
+		CurrentBGColor = UTOrange;
+	}
+	else
+	{
+		UE_LOG(LogUTKBLightShow, Warning, TEXT("Failed to set lighting"));
+	}
 }
 
 void FLightShow::ClearColorToBlack()
@@ -196,6 +231,12 @@ void FLightShow::ClearColorToBlack()
 		return;
 	}
 
-	CurrentBGColor = Black;
-	LogiLedSetLighting(Black.r, Black.g, Black.b);
+	if (LogiLedSetLighting(Black.r, Black.g, Black.b))
+	{
+		CurrentBGColor = Black;
+	}
+	else
+	{
+		UE_LOG(LogUTKBLightShow, Warning, TEXT("Failed to set lighting"));
+	}
 }
